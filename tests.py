@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from event_queue import Circle_Buffer
+from event_framework import Circle_Buffer
 
 class CircleBufferCase(unittest.TestCase):
 	
@@ -15,7 +15,7 @@ class CircleBufferCase(unittest.TestCase):
 		self.assertEqual(cb.begin, 0)
 		self.assertEqual(cb.end, -1)
 		self.assertEqual(cb.growable, False)
-		self.assertEqual(cb.dtype, np.float64)
+		self.assertEqual(cb.dtype, 'f8')
 
 
 		cb.push(5)
@@ -123,7 +123,7 @@ class CircleBufferCase(unittest.TestCase):
 		self.assertEqual(cb.begin, 0)
 		self.assertEqual(cb.end, -1)
 		self.assertEqual(cb.growable, True)
-		self.assertEqual(cb.dtype, np.float64)
+		self.assertEqual(cb.dtype, "f8")
 
 		cb.push(3)
 		cb.push(7)
