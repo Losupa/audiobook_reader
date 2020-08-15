@@ -23,11 +23,22 @@ class Circle_Buffer(object):
 
 		return self.size
 
-	def at(self, index):
-		try:
-			return self.cbuffer[index]
-		except:
-			pass
+	def __getitem__(self, key):
+		if isinstance(key, slice):
+			start, stop, step = key.indices(len(self))
+			return self.cbuffer[start:stop:step]
+		elif isinstance(key, int):
+			return self.cbuffer[key]
+		else:
+			raise TypeError("Invalid argument type: {}".format(type(key)))
+	def __setitem__(self, key, value):
+		if isinstance(key, slice):
+			start, stop, step = key.indices(len(self))
+			self.cbuffer[start:stop:step] = value
+		elif isinstance(key, int):
+			self.cbuffer[key] = value
+		else:
+			raise TypeError("Invalid argument type: {}".format(type(key)))
 
 	def front(self):
 		return self.cbuffer[self.begin]
@@ -73,7 +84,8 @@ class Event_Node(Circle_Buffer):
 	def __init__(self, node_num=None, cb_capacity=200, cb_growable=True, cb_dtype="u4, U16"):
 		"""
 		Event queue for the event node
-		with a parent class of a Circle_Buffer
+		with utilizing 2 Circle_Buffers-one for incoming events
+		and one for outgoing events
 		Default Datatype: unsigned 4 byte int, unicode 16 char string
 		"""
 		# Inherits from Parent class all varaibles
