@@ -4,6 +4,10 @@ import numpy as np
 
 from event_framework import Circle_Buffer
 
+from threading import Thread
+from time import sleep, time
+from datetime import datetime, timedelta
+
 class CircleBufferCase(unittest.TestCase):
 	
 	def test_basic_init(self):
@@ -24,6 +28,7 @@ class CircleBufferCase(unittest.TestCase):
 		self.assertEqual(cb.end, 0)
 		self.assertAlmostEqual(cb.front(), 5)
 		self.assertAlmostEqual(cb.back(), 5)
+		self.assertAlmostEqual(cb[0], 5)
 
 		cb.push(10)
 		self.assertEqual(len(cb), 2)
@@ -31,6 +36,8 @@ class CircleBufferCase(unittest.TestCase):
 		self.assertEqual(cb.end, 1)
 		self.assertAlmostEqual(cb.front(), 5)
 		self.assertAlmostEqual(cb.back(), 10)
+		self.assertAlmostEqual(cb[1], 10)
+
 
 		cb.pop()
 		self.assertEqual(len(cb), 1)
@@ -43,6 +50,10 @@ class CircleBufferCase(unittest.TestCase):
 		self.assertEqual(len(cb), 0)
 		self.assertEqual(cb.begin, 2)
 		self.assertEqual(cb.end, 1)
+
+		cb[0] = 15
+		self.assertAlmostEqual(cb[0], 15)
+
 
 	def test_different_cap(self):
 		cb = Circle_Buffer(capacity=2)
@@ -175,6 +186,38 @@ class CircleBufferCase(unittest.TestCase):
 
 		cb.pop()
 		self.assertAlmostEqual(cb.front(), 11)
+
+	def test_cb_push_multithreading(self):
+
+		'''
+		Basic test on whether or not circle buffer push is thread safe as long
+		as circle buffer does not become too full
+		'''
+		def push_to_cb(self, cb):
+			for i in range(10, 20):
+				cb.push(100)
+				#print("T1: {}".format(cb[0:len(cb)]))
+
+		def modify_cb(self, cb):
+			i = 0
+			for i in range(10):
+				cb[i] = i
+				#print("T2: {}".format(cb[0:len(cb)]))
+		
+		cb = Circle_Buffer()
+
+		cb.push(5)
+		cb.push(6)
+		cb.push(7)
+		cb.push(8)
+		cb.push(9)
+
+		t1 = Thread(target=push_to_cb, args=(self, cb))
+		t2 = Thread(target=modify_cb, args=(self, cb))
+		t1.start()
+		t2.start()
+		t1.join()
+		t2.join()
 
 
 if __name__ == '__main__':

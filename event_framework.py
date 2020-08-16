@@ -19,6 +19,9 @@ class Circle_Buffer(object):
 		self.dtype = dtype
 		self.growable = growable
 
+	def __repr__(self):
+	 return self.cbuffer.__repr__()
+
 	def __len__(self):
 
 		return self.size
@@ -31,6 +34,7 @@ class Circle_Buffer(object):
 			return self.cbuffer[key]
 		else:
 			raise TypeError("Invalid argument type: {}".format(type(key)))
+	
 	def __setitem__(self, key, value):
 		if isinstance(key, slice):
 			start, stop, step = key.indices(len(self))
@@ -141,7 +145,8 @@ class Event_Manager(Circle_Buffer):
 		# and false otherwise
 		self.flag = False
 
-		self.lock = Event()
+		# Main lock for circle_buffer
+		self.cb_lock = Event()
 
 
 	def add_node(self, event_node):
