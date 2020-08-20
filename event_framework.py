@@ -1,6 +1,7 @@
-from threading import Thread, Lock
+from threading import Thread, Lock, Event, Condition
 import queue
 import numpy as np
+from time import sleep
 
 
 class Circle_Buffer(object):
@@ -50,6 +51,13 @@ class Circle_Buffer(object):
 	def back(self):
 		return self.cbuffer[self.end]
 
+	def all(self):
+		if self.size == 0:
+			return np.array([])
+		elif self.begin > self.end:
+			return np.concatenate(self.cbuffer[:self.end], self.cbuffer[self.begin:])
+		return self.cbuffer[self.begin:self.end]
+
 	def push(self, new_value):
 
 		if (self.size >= self.capacity):
@@ -62,7 +70,6 @@ class Circle_Buffer(object):
 		self.end = (self.begin + self.size) % self.capacity
 		self.cbuffer[self.end] = new_value
 		self.size += 1
-
 		
 	def pop(self):
 		if (self.size > 0):
@@ -96,8 +103,8 @@ class Event_Node(Circle_Buffer):
 		# and functions, as well as calling its init function
 		super().__init__(cb_capacity, cb_growable, cb_dtype)
 
-		# Unique Node number that will be attached to all
-		# events when published
+		# Unique Node number relative to event manager
+		# Event Manager's Node Num is 0
 		self.node_num = node_num
 
 		# Event manager that will be a central bus
@@ -114,18 +121,15 @@ class Event_Node(Circle_Buffer):
 		'''
 		event_manager.lock.clear()
 		self.event_manager = event_manager
-		event_manager.add_node(self)
+		self.node_num = event_manager.add_node(self)
 		event_manager.lock.set()
 
 	def publish(self, event):
 		# Perhaps change wait to check if lock is set
 		# and if it is then add event to temporary queue
 		# which will be added once lock is set
-		self.event_manager.lock()
-		self.event_manager.lock.clear()
 
-		self.event_manager.push(self.node_num, event)
-		self.event_manager.lock.set()
+		self.event_manager.push_event(self.node_num, event)
 
 	def process(self):
 		pass
@@ -140,24 +144,79 @@ class Event_Manager(Circle_Buffer):
 
 		# List of nodes to be broadcasted to
 		self.event_nodes = []
+		# Event Manager's default node num is 0
+		self.node_num = 0
+
 
 		# Flag that is True when events need to be broadcast
 		# and false otherwise
-		self.flag = False
+		self.flag = Condition(Lock())
+		self.flag.acquire()
+
+		self.flag_lock = Event()
 
 		# Main lock for circle_buffer
 		self.cb_lock = Event()
 
+		# Lock for list of nodes
+		self.nodes_lock = Event()
+
+
 
 	def add_node(self, event_node):
+		self.nodes_lock.clear()
 		self.event_nodes.append(event_node)
+		self.nodes_lock.set()
+		return len(event_nodes)
+
+	def push_event(self, event):
+		"""
+		Pushes event to Event Manager CB
+		and sets flag to True if not already
+		"""
+
+		self.cb_lock.wait()
+		self.cb_lock.clear()
+		self.push(self.node_num, event)
+		self.cb_lock.set()
+		
+		self.flag_lock.wait()
+		self.flag_lock.clear()
+		
+		if self.flag.locked():
+			self.flag.release()
+
+		self.flag_lock.set()
+		
+
+
+	def pop_event(self):
+		self.cb_lock.wait()
+		self.cb_lock.clear()
+		self.pop()
+
+		if self.size == 0:
+			self.flag.acquire(False)
+
+		self.cb_lock.set()
+
 
 	def notify(self):
 
-		for node in self.event_nodes:
-			node.push(self.front())
+		while not self.flag.locked():
+			
+			# Does not notify if list of nodes is being modified
+			self.nodes_lock.wait()
 
-		self.pop()
+			for node in self.event_nodes:
+				node.cb_lock.wait()
+				node.cb_lock.clear()
+
+				node.push(self.front())
+				
+				node.cb_lock.set()
+
+			self.pop_event()
 
 	def run(self):
 		"""
@@ -165,4 +224,7 @@ class Event_Manager(Circle_Buffer):
 		on the Event Manager and notifying when new events flag
 		is set
 		"""
-		pass
+		while (True):
+			
+			self.flag.wait()
+			self.notify()
